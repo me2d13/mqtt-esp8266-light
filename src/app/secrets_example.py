@@ -5,3 +5,4 @@ WIFI_PASSWORD = ''
 MQTT_HOST = '192.168.1.100'
 MQTT_PORT = 1883
 BASE_TOPIC = '/devices/rgbled/'
+GITHUB_URL = 'https://github.com/me2d13/mqtt-esp8266-light'
