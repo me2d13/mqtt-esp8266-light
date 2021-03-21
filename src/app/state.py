@@ -2,9 +2,11 @@ import ujson
 
 class State:
     def __init__(self):
-        self.red = 0
-        self.green = 0
-        self.blue = 0
+        self.red = 255
+        self.green = 255
+        self.blue = 255
+        self.brightness = 255
+        self.is_on = False
         self.log_mqtt = True
 
 

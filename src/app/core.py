@@ -9,6 +9,7 @@ from app.ota_updater import OTAUpdater
 import app.secrets as secrets
 from app.state import State
 from app.mqtt import init_mqtt
+from app.light import Light
 
 def check_for_updates():
     print('Checking for updates...')
@@ -36,7 +37,8 @@ def init_state():
 
 def main():
     state = init_state()
-    client = init_mqtt(state)
+    light = Light(state)
+    client = init_mqtt(state, light)
     app.wifi.connect_wifi()
     check_for_updates()
     while True:
