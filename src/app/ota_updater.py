@@ -68,8 +68,7 @@ class OTAUpdater:
         latest_version = self.get_latest_version()
 
         print('Checking version... ')
-        print('\tCurrent version: ', current_version)
-        print('\tLatest version: ', latest_version)
+        print('\tCurrent version {}, latest version {}'.format(current_version, latest_version))
         return (current_version, latest_version)
 
     def _create_new_version_file(self, latest_version):
@@ -93,7 +92,7 @@ class OTAUpdater:
 
     def _download_new_version(self, version):
         print('Downloading version {}'.format(version))
-        version = 'main' # force master branch for testing
+        #version = 'main' # force master branch for testing
         file_list = self.download_explicit_file_list(version)
         if file_list:
             self.download_by_file_list(file_list, version)
@@ -103,7 +102,6 @@ class OTAUpdater:
 
     def download_explicit_file_list(self, version):
         url = 'https://raw.githubusercontent.com/{}/{}/{}'.format(self.github_repo, version, self.file_list_name)
-        print('Trying to fetch file list from', url)
         file_list = None
         file_list_response = self.http_client.get(url)
         if file_list_response.status_code == 200:
@@ -148,29 +146,23 @@ class OTAUpdater:
 
     def _download_file(self, version, gitPath, path):
         file_url = 'https://raw.githubusercontent.com/{}/{}/{}'.format(self.github_repo, version, gitPath)
-        print('Fetching', file_url)
         self.http_client.get(file_url, saveToFile=path)
 
     def _copy_secrets_file(self):
         if self.secrets_file:
             fromPath = self.modulepath(self.main_dir + '/' + self.secrets_file)
             toPath = self.modulepath(self.new_version_dir + '/' + self.main_dir + '/' + self.secrets_file)
-            print('Copying secrets file from {} to {}'.format(fromPath, toPath))
             self._copy_file(fromPath, toPath)
             print('Copied secrets file from {} to {}'.format(fromPath, toPath))
 
     def _delete_old_version(self):
-        print('Deleting old version at {} ...'.format(self.modulepath(self.main_dir)))
         self._rmtree(self.modulepath(self.main_dir))
         print('Deleted old version at {} ...'.format(self.modulepath(self.main_dir)))
 
     def _install_new_version(self):
         print('Installing new version from {} to {} ...'.format(self.modulepath(self.new_version_dir), self.modulepath(self.main_dir)))
-        if self._os_supports_rename() and False:
-            os.rename(self.modulepath(self.new_version_dir), self.modulepath(self.main_dir))
-        else:
-            self._copy_directory(self.modulepath(self.new_version_dir), self.modulepath('/'))
-            self._rmtree(self.modulepath(self.new_version_dir))
+        self._copy_directory(self.modulepath(self.new_version_dir), self.modulepath('/'))
+        self._rmtree(self.modulepath(self.new_version_dir))
         print('Update installed, please reboot now')
 
     def _rmtree(self, directory):
@@ -181,13 +173,6 @@ class OTAUpdater:
             else:
                 os.remove(directory + '/' + entry[0])
         os.rmdir(directory)
-
-    def _os_supports_rename(self) -> bool:
-        self._mk_dirs('otaUpdater/osRenameTest')
-        os.rename('otaUpdater', 'otaUpdated')
-        result = len(os.listdir('otaUpdated')) > 0
-        self._rmtree('otaUpdated')
-        return result
 
     def _copy_directory(self, fromPath, toPath):
         if not self._exists_dir(toPath):
