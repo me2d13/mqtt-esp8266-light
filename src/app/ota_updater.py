@@ -2,12 +2,8 @@ import os, gc
 from .httpclient import HttpClient
 
 class OTAUpdater:
-    """
-    A class to update your MicroController with the latest version from a GitHub tagged release,
-    optimized for low power usage.
-    """
 
-    def __init__(self, github_repo, github_src_dir='', module='', main_dir='main', new_version_dir='next', secrets_file=None, headers={}):
+    def __init__(self, github_repo, github_src_dir='', module='', main_dir='main', new_version_dir='next', secrets_file=None, headers={}, file_list_name='ota_files.txt'):
         self.http_client = HttpClient(headers=headers)
         self.github_repo = github_repo.rstrip('/').replace('https://github.com/', '')
         self.github_src_dir = '' if len(github_src_dir) < 1 else github_src_dir.rstrip('/') + '/'
@@ -15,24 +11,12 @@ class OTAUpdater:
         self.main_dir = main_dir
         self.new_version_dir = new_version_dir
         self.secrets_file = secrets_file
+        self.file_list_name = file_list_name
 
     def __del__(self):
         self.http_client = None
 
     def check_for_update_to_install_during_next_reboot(self) -> bool:
-        """Function which will check the GitHub repo if there is a newer version available.
-        
-        This method expects an active internet connection and will compare the current 
-        version with the latest version available on GitHub.
-        If a newer version is available, the file 'next/.version' will be created 
-        and you need to call machine.reset(). A reset is needed as the installation process 
-        takes up a lot of memory (mostly due to the http stack)
-
-        Returns
-        -------
-            bool: true if a new version is available, false otherwise
-        """
-
         (current_version, latest_version) = self._check_for_new_version()
         if latest_version > current_version:
             print('New version available, will download and install on next reboot')
@@ -42,15 +26,6 @@ class OTAUpdater:
         return False
 
     def install_update_if_available_after_boot(self, ssid, password) -> bool:
-        """This method will install the latest version if out-of-date after boot.
-        
-        This method, which should be called first thing after booting, will check if the 
-        next/.version' file exists. 
-
-        - If yes, it initializes the WIFI connection, downloads the latest version and installs it
-        - If no, the WIFI connection is not initialized as no new known version is available
-        """
-
         if self.new_version_dir in os.listdir(self.module):
             if '.version' in os.listdir(self.modulepath(self.new_version_dir)):
                 latest_version = self.get_version(self.modulepath(self.new_version_dir), '.version')
@@ -63,17 +38,6 @@ class OTAUpdater:
         return False
 
     def install_update_if_available(self) -> bool:
-        """This method will immediately install the latest version if out-of-date.
-        
-        This method expects an active internet connection and allows you to decide yourself
-        if you want to install the latest version. It is necessary to run it directly after boot 
-        (for memory reasons) and you need to restart the microcontroller if a new version is found.
-
-        Returns
-        -------
-            bool: true if a new version is available, false otherwise
-        """
-
         (current_version, latest_version) = self._check_for_new_version()
         if latest_version > current_version:
             print('Updating to version {}...'.format(latest_version))
@@ -83,7 +47,7 @@ class OTAUpdater:
             self._delete_old_version()
             self._install_new_version()
             return True
-        
+        print('No new version found, current {} is ok'.format(current_version))
         return False
 
 
@@ -129,8 +93,40 @@ class OTAUpdater:
 
     def _download_new_version(self, version):
         print('Downloading version {}'.format(version))
-        self._download_all_files(version)
+        version = 'main' # force master branch for testing
+        file_list = self.download_explicit_file_list(version)
+        if file_list:
+            self.download_by_file_list(file_list, version)
+        else:
+            self._download_all_files(version)
         print('Version {} downloaded to {}'.format(version, self.modulepath(self.new_version_dir)))
+
+    def download_explicit_file_list(self, version):
+        url = 'https://raw.githubusercontent.com/{}/{}/{}'.format(self.github_repo, version, self.file_list_name)
+        print('Trying to fetch file list from', url)
+        file_list = None
+        file_list_response = self.http_client.get(url)
+        if file_list_response.status_code == 200:
+            file_list = file_list_response.text.split('\n')
+        file_list_response.close()
+        return file_list
+    
+    def download_by_file_list(self, file_list, version):
+        for file_path in file_list:
+            complete_file_path = self.modulepath(self.new_version_dir + '/' + file_path)
+            path_and_file = complete_file_path.rsplit('/', 1)
+            path = None
+            git_path = None
+            if len(path_and_file) == 1:
+                path = self.new_version_dir
+                git_path = path_and_file[0]
+            else:
+                git_path = self.github_src_dir + file_path
+                path = complete_file_path
+                target_dir = path_and_file[0]
+                self._mk_dirs(target_dir)
+            print('\tDownloading: ', git_path, 'to', path)
+            self._download_file(version, git_path, path)
 
     def _download_all_files(self, version, sub_dir=''):
         url = 'https://api.github.com/repos/{}/contents{}{}{}?ref=refs/tags/{}'.format(self.github_repo, self.github_src_dir, self.main_dir, sub_dir, version)
@@ -156,7 +152,7 @@ class OTAUpdater:
     def _copy_secrets_file(self):
         if self.secrets_file:
             fromPath = self.modulepath(self.main_dir + '/' + self.secrets_file)
-            toPath = self.modulepath(self.new_version_dir + '/' + self.secrets_file)
+            toPath = self.modulepath(self.new_version_dir + '/' + self.main_dir + '/' + self.secrets_file)
             print('Copying secrets file from {} to {}'.format(fromPath, toPath))
             self._copy_file(fromPath, toPath)
             print('Copied secrets file from {} to {}'.format(fromPath, toPath))
@@ -167,11 +163,11 @@ class OTAUpdater:
         print('Deleted old version at {} ...'.format(self.modulepath(self.main_dir)))
 
     def _install_new_version(self):
-        print('Installing new version at {} ...'.format(self.modulepath(self.main_dir)))
-        if self._os_supports_rename():
+        print('Installing new version from {} to {} ...'.format(self.modulepath(self.new_version_dir), self.modulepath(self.main_dir)))
+        if self._os_supports_rename() and False:
             os.rename(self.modulepath(self.new_version_dir), self.modulepath(self.main_dir))
         else:
-            self._copy_directory(self.modulepath(self.new_version_dir), self.modulepath(self.main_dir))
+            self._copy_directory(self.modulepath(self.new_version_dir), self.modulepath('/'))
             self._rmtree(self.modulepath(self.new_version_dir))
         print('Update installed, please reboot now')
 
@@ -228,14 +224,12 @@ class OTAUpdater:
             self.mkdir(pathToCreate + x)
             pathToCreate = pathToCreate + x + '/'
 
-    # different micropython versions act differently when directory already exists
     def mkdir(self, path:str):
         try:
             os.mkdir(path)
         except OSError as exc:
             if exc.args[0] == 17: 
                 pass
-
 
     def modulepath(self, path):
         return self.module + '/' + path if self.module else path

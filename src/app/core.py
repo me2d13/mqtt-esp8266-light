@@ -10,6 +10,7 @@ import app.secrets as secrets
 from app.state import State
 from app.mqtt import init_mqtt
 from app.light import Light
+import utime
 
 def check_for_updates():
     print('Checking for updates...')
@@ -23,6 +24,7 @@ def check_for_updates():
     if was_installed:
         print('Update installed, reboot...')
         machine.reset()
+        utime.sleep(5)
     else:
         print('No new version found')
 
@@ -36,11 +38,11 @@ def init_state():
 
 
 def main():
+    app.wifi.connect_wifi()
+    check_for_updates()
     state = init_state()
     light = Light(state)
     client = init_mqtt(state, light)
-    app.wifi.connect_wifi()
-    check_for_updates()
     while True:
         client.wait_msg()
     client.disconnect()
