@@ -16,17 +16,19 @@ def check_for_updates():
     print('Checking for updates...')
     otaUpdater = OTAUpdater(secrets.GITHUB_URL, github_src_dir='src', main_dir='app', secrets_file="secrets.py")
     was_installed = False
+    version = '?'
     try:
-        was_installed = otaUpdater.install_update_if_available()
+        (was_installed, version) = otaUpdater.install_update_if_available()
     except Exception as e:
         print('Error during update check:', e)
     del(otaUpdater)
     if was_installed:
-        print('Update installed, reboot...')
+        print('Update to version {} installed, reboot...'.format(version))
         machine.reset()
         utime.sleep(5)
     else:
-        print('No new version found')
+        print('Current version {} ok, no new version found'.format(version))
+    return version
 
 def init_state():
     state = State()
@@ -39,10 +41,10 @@ def init_state():
 
 def main():
     app.wifi.connect_wifi()
-    check_for_updates()
+    version = check_for_updates()
     state = init_state()
     light = Light(state)
-    client = init_mqtt(state, light)
+    client = init_mqtt(state, light, version)
     while True:
         client.wait_msg()
     client.disconnect()

@@ -14,7 +14,7 @@ def dispatch_message(topic, msg, light):
         light.log_function('Json parsing error for ' + msg)
 
 
-def init_mqtt(state, light):
+def init_mqtt(state, light, version):
     def callback_with_light(topic, msg):
         dispatch_message(topic, msg, light)
 
@@ -28,7 +28,7 @@ def init_mqtt(state, light):
     client.subscribe(secrets.COMMAND_TOPIC)
     print('MQTT subscribed to', secrets.COMMAND_TOPIC)
     if state.log_mqtt:
-        client.publish(secrets.LOG_TOPIC, "Device {} alive".format(secrets.STATE_TOPIC))
+        client.publish(secrets.LOG_TOPIC, "Device {} alive with version {}".format(secrets.STATE_TOPIC, version))
         light.log_function = mqtt_log
 
     return client

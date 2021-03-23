@@ -37,7 +37,7 @@ class OTAUpdater:
         print('No new updates found...')
         return False
 
-    def install_update_if_available(self) -> bool:
+    def install_update_if_available(self):
         (current_version, latest_version) = self._check_for_new_version()
         if latest_version > current_version:
             print('Updating to version {}...'.format(latest_version))
@@ -46,9 +46,9 @@ class OTAUpdater:
             self._copy_secrets_file()
             self._delete_old_version()
             self._install_new_version()
-            return True
+            return (True, latest_version)
         print('No new version found, current {} is ok'.format(current_version))
-        return False
+        return (False, current_version)
 
 
     @staticmethod
@@ -64,7 +64,7 @@ class OTAUpdater:
         print('network config:', sta_if.ifconfig())
 
     def _check_for_new_version(self):
-        current_version = self.get_version(self.modulepath(self.main_dir))
+        current_version = self.get_version(self.modulepath('/'))
         latest_version = self.get_latest_version()
 
         print('Checking version... ')
@@ -147,7 +147,9 @@ class OTAUpdater:
         file_list.close()
 
     def _download_file(self, version, gitPath, path):
-        self.http_client.get('https://raw.githubusercontent.com/{}/{}/{}'.format(self.github_repo, version, gitPath), saveToFile=path)
+        file_url = 'https://raw.githubusercontent.com/{}/{}/{}'.format(self.github_repo, version, gitPath)
+        print('Fetching', file_url)
+        self.http_client.get(file_url, saveToFile=path)
 
     def _copy_secrets_file(self):
         if self.secrets_file:
