@@ -4,7 +4,7 @@ from machine import Pin, PWM
 
 class Light:
     def __init__(self, state):
-        freq = 200
+        freq = 1000
         self.pin_r = PWM(Pin(secrets.PIN_R, Pin.OUT), freq)
         self.pin_g = PWM(Pin(secrets.PIN_G, Pin.OUT), freq)
         self.pin_b = PWM(Pin(secrets.PIN_B, Pin.OUT), freq)
@@ -37,9 +37,9 @@ class Light:
         log_message = "Setting PWM RGB to {} {} {}".format(red, green, blue)
         print(log_message)
         self.log_function(log_message)
-        self.pin_r.duty(red)
-        self.pin_g.duty(green)
-        self.pin_b.duty(blue)
+        self.pin_r.duty(int(red))
+        self.pin_g.duty(int(green))
+        self.pin_b.duty(int(blue))
         
 
     def calculate_state_from_message_payload(self, payload):
