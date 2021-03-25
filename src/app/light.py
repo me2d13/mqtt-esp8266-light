@@ -37,9 +37,9 @@ class Light:
         log_message = "Setting PWM RGB to {} {} {}".format(red, green, blue)
         print(log_message)
         self.log_function(log_message)
-        self.pin_r.duty(self.state.red)
-        self.pin_g.duty(self.state.green)
-        self.pin_b.duty(self.state.blue)
+        self.pin_r.duty(red)
+        self.pin_g.duty(green)
+        self.pin_b.duty(blue)
         
 
     def calculate_state_from_message_payload(self, payload):
